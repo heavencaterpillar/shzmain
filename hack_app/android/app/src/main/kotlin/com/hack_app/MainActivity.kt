@@ -1,4 +1,4 @@
-package com.hack_appclient
+package com.hack_app
 
 import io.flutter.embedding.android.FlutterActivity
 

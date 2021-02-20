@@ -1,4 +1,4 @@
-# hack_appclient
+# hack_app
 
 Hackaton Flutter application.
 
