@@ -8,6 +8,8 @@ class mapController extends StatefulWidget {
 
 class _mapControllerPageState extends State<mapController> {
   GoogleMapController mapController;
+  BitmapDescriptor pinLocationIcon;
+  Set<Marker> _markers = {};
 
   final LatLng _center = const LatLng(45.521563, -122.677433);
 
