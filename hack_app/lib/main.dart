@@ -6,7 +6,9 @@ import 'dart:math';
 
 import 'startActions.dart';
 import 'pathSearch.dart';
+import 'pathCheck.dart';
 import 'waitAccept.dart';
+import 'taxiComingFar.dart';
 
 void main() {
   runApp(MyApp());
@@ -43,6 +45,7 @@ class _MyHomePageState extends State<MyHomePage> {
   String stage = "start_actions";
   BitmapDescriptor carLocationIcon;
   PolylinePoints polylinePoints = PolylinePoints();
+  LatLng startPoint, destPoint;
 
   final LatLng _center = const LatLng(50.48, 30.5);
   var rnd = new Random();
@@ -54,7 +57,7 @@ class _MyHomePageState extends State<MyHomePage> {
         .then((onValue) {
       carLocationIcon = onValue;
 
-      for (int i = 0; i < 5; i++) {
+      for (int i = 0; i < 15; i++) {
         setState(() {
           _carsPoss.add(new LatLng(
               _center.latitude + rnd.nextInt(1500) / 10000 - 0.075,
@@ -91,7 +94,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void func() {
     iter++;
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 15; i++) {
       if (_carsMoving[i] &&
           _carsLastPointsNum[i] < _carsMovingPaths[i].length - 1) {
         double dlat = _carsMovingPaths[i][_carsLastPointsNum[i]].latitude -
@@ -113,6 +116,7 @@ class _MyHomePageState extends State<MyHomePage> {
               _carsPoss[i].latitude + 0.0003 * dlat / importantLen,
               _carsPoss[i].longitude + 0.0003 * dlong / importantLen);
         }
+
         setState(() {
           _cars.removeWhere((m) => m.markerId.value == i.toString());
 
@@ -128,12 +132,25 @@ class _MyHomePageState extends State<MyHomePage> {
       }
     }
 
+    if (carSelected > -1) {
+      if (len(_carsPoss[carSelected], startPoint) < 0.002) {
+        setState(() {
+          stage = "taxi_coming_near";
+        });
+      }
+    }
+
     sleep().then((value) => func()).catchError((e) => print(e));
   }
 
   Future sleep() {
     return new Future.delayed(
         const Duration(seconds: 1), () => print("All right"));
+  }
+
+  Future sleepAcceptance() {
+    return new Future.delayed(
+        const Duration(seconds: 3), () => stage = "taxi_coming_far");
   }
 
   Future<bool> findPath(i) async {
@@ -156,6 +173,118 @@ class _MyHomePageState extends State<MyHomePage> {
       _carsMoving[i] = false;
   }
 
+  void fromSearchToCheck(LatLng start, LatLng end) async {
+    setState(() {
+      startPoint = start;
+      destPoint = end;
+      stage = "path_check";
+    });
+    Marker startMarker = Marker(
+      markerId: MarkerId('start'),
+      position: startPoint,
+      infoWindow: InfoWindow(
+        title: 'Start',
+      ),
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+    );
+
+    Marker destinationMarker = Marker(
+      markerId: MarkerId('dest'),
+      position: destPoint,
+      infoWindow: InfoWindow(
+        title: 'Destination',
+      ),
+      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+    );
+
+    setState(() {
+      markersStartAndEnd = {};
+      markersStartAndEnd.add(startMarker);
+      markersStartAndEnd.add(destinationMarker);
+    });
+
+    PolylinePoints polylinePoints = PolylinePoints();
+    polylineCoordinates = [];
+    polylines = {};
+
+    PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
+      "AIzaSyDKjIoArzjQjTAOmf5PRN-XoqkHxqsf6-A",
+      PointLatLng(startPoint.latitude, startPoint.longitude),
+      PointLatLng(destPoint.latitude, destPoint.longitude),
+      travelMode: TravelMode.driving,
+    );
+
+    if (result.points.isNotEmpty) {
+      result.points.forEach((PointLatLng point) {
+        polylineCoordinates.add(LatLng(point.latitude, point.longitude));
+      });
+    }
+
+    PolylineId id = PolylineId('poly');
+
+    Polyline polyline = Polyline(
+      polylineId: id,
+      color: Colors.green,
+      points: polylineCoordinates,
+      width: 3,
+    );
+    setState(() {
+      polylines[id] = polyline;
+    });
+  }
+
+  Set<Marker> markersStartAndEnd = {};
+  List<LatLng> polylineCoordinates = [];
+  Map<PolylineId, Polyline> polylines = {};
+  int carSelected = -1;
+
+  void findCar() async {
+    double minlen = -1, templen;
+    int minCar = -1;
+    for (int i = 0; i < _carsPoss.length; i++) {
+      templen = len(_carsPoss[i], startPoint);
+      if (minCar < 0 || minlen > templen) {
+        minCar = i;
+        minlen = templen;
+      }
+    }
+    carSelected = minCar;
+    _carsMoving[carSelected] = true;
+    _carsLastPointsNum[carSelected] = 0;
+    _carsMoving[carSelected] = true;
+
+    PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
+      "AIzaSyDKjIoArzjQjTAOmf5PRN-XoqkHxqsf6-A",
+      PointLatLng(
+          _carsPoss[carSelected].latitude, _carsPoss[carSelected].longitude),
+      PointLatLng(startPoint.latitude, startPoint.longitude),
+      travelMode: TravelMode.driving,
+    );
+
+    _carsMovingPaths[carSelected] = List<LatLng>();
+
+    if (result.points.isNotEmpty) {
+      result.points.forEach((PointLatLng point) {
+        _carsMovingPaths[carSelected]
+            .add(LatLng(point.latitude, point.longitude));
+      });
+    }
+
+    PolylineId id = PolylineId('poly2');
+
+    Polyline polyline = Polyline(
+      polylineId: id,
+      color: Colors.yellowAccent,
+      points: _carsMovingPaths[carSelected],
+      width: 3,
+    );
+    setState(() {
+      polylines[id] = polyline;
+    });
+  }
+
+  int stateNumTaxiNear = 0;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -172,10 +301,30 @@ class _MyHomePageState extends State<MyHomePage> {
               cars: _cars,
             )
           : stage == "path_search"
-              ? PathSearch()
+              ? PathSearch(next: fromSearchToCheck)
               : stage == "wait_accept"
                   ? WaitAcceptation()
-                  : Container(),
+                  : stage == "path_check"
+                      ? PathCheck(
+                          start: startPoint,
+                          end: destPoint,
+                          markers: markersStartAndEnd,
+                          polylines: polylines,
+                        )
+                      : stage == "taxi_coming_far" ||
+                              (stage == "taxi_coming_near" &&
+                                  stateNumTaxiNear == 0)
+                          ? TaxiComingFar(
+                              car: _cars.elementAt(carSelected),
+                              polylines: polylines,
+                              userMarker: markersStartAndEnd.elementAt(0),
+                              userPosition: startPoint,
+                            )
+                          : stage == "taxi_coming_near" && stateNumTaxiNear == 1
+                              ? Container(
+                                  child: Text(
+                                      "AR WILL BE HERE. _carsPoss[carSelected] - позиція необхідного нам таксі"))
+                              : Container(),
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
@@ -198,14 +347,28 @@ class _MyHomePageState extends State<MyHomePage> {
           ],
         ),
       ),
-      floatingActionButton: stage == "path_search"
+      floatingActionButton: stage == "path_check"
           ? FloatingActionButton(
-              onPressed: () => setState(() => stage = "wait_accept"),
+              onPressed: () => setState(
+                  () => {stage = "wait_accept", findCar(), sleepAcceptance()}),
               tooltip: 'next',
               backgroundColor: Colors.green,
               child: const Icon(Icons.navigate_next),
             )
-          : null,
+          : stage == "taxi_coming_near" || stage ==  "taxi_coming_far"
+              ? (stateNumTaxiNear == 0
+                  ? FloatingActionButton(
+                      onPressed: () => setState(() => {stateNumTaxiNear = 1}),
+                      tooltip: 'To AR',
+                      backgroundColor: Colors.green,
+                      child: const Icon(Icons.remove_red_eye),
+                    )
+                  : FloatingActionButton(
+                      onPressed: () => setState(() => {stateNumTaxiNear = 0}),
+                      tooltip: 'To map',
+                      backgroundColor: Colors.green,
+                      child: const Icon(Icons.map)))
+              : null,
     );
   }
 }
