@@ -311,16 +311,16 @@ class _MyHomePageState extends State<MyHomePage> {
                           markers: markersStartAndEnd,
                           polylines: polylines,
                         )
-                      : stage == "taxi_coming_far" ||
-                              (stage == "taxi_coming_near" &&
-                                  stateNumTaxiNear == 0)
+                      : (stage == "taxi_coming_far" ||
+                              stage == "taxi_coming_near") &&
+                                  stateNumTaxiNear == 0
                           ? TaxiComingFar(
                               car: _cars.elementAt(carSelected),
                               polylines: polylines,
                               userMarker: markersStartAndEnd.elementAt(0),
                               userPosition: startPoint,
                             )
-                          : stage == "taxi_coming_near" && stateNumTaxiNear == 1
+                          : stateNumTaxiNear == 1
                               ? Container(
                                   child: Text(
                                       "AR WILL BE HERE. _carsPoss[carSelected] - позиція необхідного нам таксі"))
@@ -355,16 +355,16 @@ class _MyHomePageState extends State<MyHomePage> {
               backgroundColor: Colors.green,
               child: const Icon(Icons.navigate_next),
             )
-          : stage == "taxi_coming_near" || stage ==  "taxi_coming_far"
+          : stage == "taxi_coming_near" || stage == "taxi_coming_far"
               ? (stateNumTaxiNear == 0
                   ? FloatingActionButton(
-                      onPressed: () => setState(() => {stateNumTaxiNear = 1}),
+                      onPressed: () => setState(() {stateNumTaxiNear = 1;}),
                       tooltip: 'To AR',
                       backgroundColor: Colors.green,
                       child: const Icon(Icons.remove_red_eye),
                     )
                   : FloatingActionButton(
-                      onPressed: () => setState(() => {stateNumTaxiNear = 0}),
+                      onPressed: () => setState(() {stateNumTaxiNear = 0;}),
                       tooltip: 'To map',
                       backgroundColor: Colors.green,
                       child: const Icon(Icons.map)))
